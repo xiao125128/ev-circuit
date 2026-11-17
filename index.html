@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0d1b2a">
+<title>自动驾驶控制系统 · 实物图部件标注</title>
+<style>
+  :root{
+    --bg:#0d1b2a; --panel:#13283f; --line:#27415f;
+    --txt:#eaf3ff; --muted:#9fb8d6; --accent:#35c2f5; --accent2:#1f8fd0;
+    --blue:#35c2f5; --orange:#ffb020; --green:#2fe08a;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB",-apple-system,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg);color:var(--txt);overflow:hidden;height:100dvh;}
+  .app{display:flex;flex-direction:column;height:100%;}
+
+  .toolbar{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--panel);
+    border-bottom:1px solid var(--line);flex-wrap:wrap;z-index:20;}
+  .toolbar .title{font-weight:800;font-size:15px;display:flex;align-items:center;gap:8px;margin-right:4px;}
+  .spacer{flex:1;}
+  .seg{display:inline-flex;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .seg button{min-width:76px;height:36px;border:none;background:transparent;color:var(--muted);font-weight:800;
+    font-size:14px;cursor:pointer;font-family:inherit;transition:all .15s;}
+  .seg button.on{background:var(--accent2);color:#fff;}
+  .tbtn{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:36px;height:36px;padding:0 12px;
+    border:1px solid var(--line);background:rgba(255,255,255,.05);color:var(--txt);border-radius:10px;font-weight:700;
+    font-size:14px;cursor:pointer;font-family:inherit;transition:all .15s;}
+  .tbtn:hover{background:rgba(255,255,255,.12);}
+  .tbtn.primary{background:var(--accent2);border-color:var(--accent2);}
+  .zoom-ind{min-width:48px;text-align:center;font-variant-numeric:tabular-nums;font-weight:800;color:var(--accent);}
+
+  .main{flex:1;display:flex;position:relative;overflow:hidden;}
+  .viewport{flex:1;position:relative;overflow:hidden;background:radial-gradient(circle at 50% 40%, #16283f 0%, #0d1b2a 70%);touch-action:none;cursor:grab;}
+  .viewport.grabbing{cursor:grabbing;}
+  .stage{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform;}
+  .stage.transition{transition:transform .35s cubic-bezier(.25,.8,.3,1);}
+  .stage img{position:absolute;left:0;top:0;width:100%;height:100%;display:block;pointer-events:none;user-select:none;
+    background:#0b1520;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+  .hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:5;font-size:12px;color:var(--muted);
+    background:rgba(13,27,42,.7);padding:6px 14px;border-radius:999px;border:1px solid var(--line);pointer-events:none;white-space:nowrap;}
+
+  /* 热点 */
+  .spot{position:absolute;left:0;top:0;width:0;height:0;z-index:4;}
+  .pin{position:absolute;left:0;top:0;margin-left:-14px;margin-top:-14px;width:28px;height:28px;border-radius:50%;
+    display:grid;place-items:center;cursor:pointer;background:rgba(255,176,32,.95);border:2px solid #fff;color:#3a2400;
+    font-weight:900;font-size:12px;box-shadow:0 3px 10px rgba(0,0,0,.45);transform:scale(var(--invscale,1));
+    transform-origin:center;transition:box-shadow .15s;}
+  .pin.inferred{background:rgba(53,194,245,.95);color:#05283a;}
+  .pin:hover{box-shadow:0 0 0 6px rgba(255,176,32,.3);}
+  .pin.inferred:hover{box-shadow:0 0 0 6px rgba(53,194,245,.3);}
+  .spot.active .pin{background:var(--green);color:#03240f;box-shadow:0 0 0 7px rgba(47,224,138,.3);}
+  .pin .lbl{position:absolute;left:50%;top:calc(100% + 4px);transform:translateX(-50%);white-space:nowrap;
+    background:rgba(13,27,42,.92);border:1px solid var(--line);color:var(--txt);font-size:11px;font-weight:600;
+    padding:2px 7px;border-radius:6px;pointer-events:none;opacity:0;transition:opacity .2s;z-index:5;}
+  .pin:hover .lbl,.spot.active .lbl{opacity:1;}
+
+  /* 侧栏 */
+  .sidebar{width:300px;flex:none;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden;transition:transform .3s ease;}
+  .sidebar .head{padding:12px 14px;font-size:13px;color:var(--muted);border-bottom:1px solid var(--line);}
+  .sidebar .head b{color:var(--txt);}
+  .list{flex:1;overflow-y:auto;padding:8px;}
+  .item{display:block;width:100%;text-align:left;padding:9px 10px;border-radius:10px;border:none;background:transparent;
+    color:var(--txt);cursor:pointer;font-family:inherit;font-size:13px;font-weight:600;transition:background .12s;}
+  .item:hover{background:rgba(255,255,255,.07);}
+  .item .nm{display:flex;align-items:center;gap:8px;}
+  .item .num{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:900;
+    background:var(--orange);color:#3a2400;}
+  .item.inferred .num{background:var(--blue);color:#05283a;}
+  .item .tag{margin-left:auto;font-size:10px;color:var(--blue);border:1px solid var(--blue);border-radius:6px;padding:1px 5px;flex:none;}
+  .item .fn{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.5;}
+  .item.active{background:rgba(47,224,138,.14);}
+  .item.active .num{background:var(--green);color:#03240f;}
+  .legend{margin-top:auto;padding:10px 14px;border-top:1px solid var(--line);font-size:11.5px;color:var(--muted);line-height:1.7;}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle;}
+  .dot.o{background:var(--orange);} .dot.b{background:var(--blue);}
+
+  /* 信息卡 */
+  .info{position:fixed;left:50%;bottom:20px;transform:translate(-50%,140%);z-index:50;width:min(560px,calc(100vw - 24px));
+    background:var(--panel);border:1px solid var(--accent);border-radius:16px;box-shadow:0 14px 50px rgba(0,0,0,.55);
+    padding:16px 18px;transition:transform .3s cubic-bezier(.3,1.3,.4,1);}
+  .info.show{transform:translate(-50%,0);}
+  .info .i-title{display:flex;align-items:center;gap:10px;font-size:18px;font-weight:900;margin-bottom:8px;flex-wrap:wrap;}
+  .info .i-title .num{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:13px;background:var(--green);color:#03240f;}
+  .info .i-title .badge{font-size:11px;color:var(--blue);border:1px solid var(--blue);border-radius:6px;padding:2px 7px;font-weight:700;}
+  .info .i-desc{font-size:14.5px;line-height:1.85;color:#dbe7f5;}
+  .info .close{position:absolute;right:12px;top:10px;width:30px;height:30px;border:none;background:rgba(255,255,255,.08);color:var(--txt);border-radius:8px;font-size:16px;cursor:pointer;}
+
+  @media (max-width:760px){
+    .main{flex-direction:column;}
+    .sidebar{position:absolute;left:0;right:0;bottom:0;width:auto;max-height:44%;z-index:30;border-left:none;border-top:1px solid var(--line);transform:translateY(100%);}
+    .sidebar.open{transform:translateY(0);}
+    .info{bottom:12px;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="toolbar">
+    <div class="title"><span>🤖</span>自动驾驶控制系统 · 部件标注</div>
+    <div class="spacer"></div>
+    <div class="seg" id="seg">
+      <button id="btnPhysical" class="on">📷 实物图</button>
+      <button id="btnCircuit">🔌 电路图</button>
+    </div>
+    <button class="tbtn" id="btnOut" title="缩小">−</button>
+    <span class="zoom-ind" id="zoomInd">100%</span>
+    <button class="tbtn" id="btnIn" title="放大">＋</button>
+    <button class="tbtn" id="btnFit" title="适应窗口">适应</button>
+    <button class="tbtn primary" id="btnList">☰ 部件清单</button>
+  </div>
+
+  <div class="main">
+    <div class="viewport" id="viewport">
+      <div class="stage" id="stage"><img id="img"></div>
+      <div class="hint">🖱️ 滚轮 / 双指缩放 · 拖拽移动 · 点击圆点看部件功能</div>
+    </div>
+
+    <div class="sidebar" id="sidebar">
+      <div class="head"><b>部件清单</b>（全部标注在实物图上）</div>
+      <div class="list" id="list"></div>
+      <div class="legend">
+        <div><span class="dot o"></span>橙点 = 实物中明确可见的部件</div>
+        <div><span class="dot b"></span>蓝点 = 接口/外部/推断位置（可调整）</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="info" id="info">
+  <button class="close" id="infoClose">✕</button>
+  <div class="i-title"><span class="num" id="infoNum">1</span><span id="infoName"></span><span class="badge" id="infoBadge" style="display:none">推断位置</span></div>
+  <div class="i-desc" id="infoDesc"></div>
+</div>
+
+<script>
+/* ============ 视图 ============ */
+const VIEWS = {
+  physical: { img:'physical.png', w:1352, h:700 },
+  circuit:  { img:'circuit.png',  w:1352, h:570 }
+};
+
+/* ============ 全部部件（都标注在实物图上） ============ */
+/* x/y 为在 physical.png 中的百分比坐标；inferred 表示接口/外部/推断位置 */
+const PARTS = [
+  { x:30.5, y:15.7, name:"交换机（统一网口）", desc:"把激光雷达、处理器、摄像头等设备的网口汇聚到同一个局域网，负责各设备之间的高速数据交换，是整车的网络枢纽。" },
+  { x:45.9, y:21.4, name:"惯导（INS/GNSS）", desc:"惯性导航与卫星定位组合系统（CHCNAV），输出系统精确的位置、姿态和航向信息，为定位导航提供基础数据。" },
+  { x:30.2, y:61.4, name:"路由器", desc:"负责网络路由与数据转发，通过 4G 网络提供对外联网能力，并互联各车载设备。" },
+  { x:58.3, y:70.0, name:"处理器（核心计算单元）", desc:"系统的“大脑”，运行感知、定位、规划等核心算法，融合处理激光雷达、摄像头等各路传感器数据。" },
+  { x:28.0, y:38.7, name:"激光雷达（LiDAR）", desc:"发射激光测量周围环境，生成高精度三维点云，用于障碍物检测与地图构建。" },
+  { x:18.9, y:74.3, name:"接线端子排（电源输入）", desc:"整机电源输入的接线端子，连接供电电池，把外部电源引入系统。" },
+
+  { x:45, y:36, name:"天线（4G/定位/GNSS/定向）", desc:"分别用于收发 4G 网络信号、接收卫星定位信号以及定向通信，通常经线缆接入惯导与路由器。", inferred:true },
+  { x:49, y:66, name:"拓展口 / USB / GMSL / 网口", desc:"各类对外接口，用于连接显示器、摄像头等外设，分布在交换机与处理器附近。", inferred:true },
+  { x:28, y:78, name:"电台", desc:"无线数传/图传设备，与地面站或其它车辆进行无线通信。", inferred:true },
+  { x:45, y:88, name:"电源管理模块", desc:"把输入电源转换为 12V / 24V 等多路电压，为各设备稳定供电。", inferred:true },
+  { x:64, y:65, name:"整车CAN（CAN_A）", desc:"接入整车 CAN 总线，读取车速、转向等车辆状态并下发控制指令。", inferred:true },
+  { x:48, y:36, name:"串口（UART / 232）", desc:"串行通信接口，用于连接惯导、电台等设备。", inferred:true },
+  { x:64, y:54, name:"显示器 / 显示器接口", desc:"连接显示器，显示系统状态与调试信息。", inferred:true },
+  { x:49, y:69.5, name:"摄像头（前后左右/后视）", desc:"车外传感器，采集车辆周围视频图像，用于视觉感知、环视与后视。", inferred:true },
+  { x:49, y:73, name:"毫米波雷达", desc:"车外传感器，通过毫米波测距测速实现障碍物检测，抗雨雾等天气干扰。", inferred:true }
+];
+
+/* ============ DOM ============ */
+const $ = id => document.getElementById(id);
+const viewport = $('viewport'), stage = $('stage'), img = $('img');
+let currentView = 'physical';
+
+function setView(v){
+  currentView = v;
+  const cfg = VIEWS[v];
+  img.src = cfg.img;
+  BW = cfg.w; BH = cfg.h;
+  stage.style.width = BW + 'px';
+  stage.style.height = BH + 'px';
+  $('btnPhysical').classList.toggle('on', v==='physical');
+  $('btnCircuit').classList.toggle('on', v==='circuit');
+  stage.querySelectorAll('.spot').forEach(s=>s.remove());
+  if(v==='physical'){
+    PARTS.forEach((p,i)=>{
+      const d = document.createElement('div');
+      d.className = 'spot';
+      d.style.left = p.x + '%';
+      d.style.top = p.y + '%';
+      d.innerHTML = '<div class="pin' + (p.inferred?' inferred':'') + '"><span>' + (i+1) + '</span><span class="lbl">' + p.name + '</span></div>';
+      d.addEventListener('click', e=>{ e.stopPropagation(); select(i); });
+      stage.appendChild(d);
+    });
+  }
+  closeInfo();
+  fit();
+}
+$('btnPhysical').addEventListener('click', ()=> setView('physical'));
+$('btnCircuit').addEventListener('click', ()=> setView('circuit'));
+
+/* ============ 侧栏 ============ */
+const list = $('list');
+PARTS.forEach((p,i)=>{
+  const b = document.createElement('button');
+  b.className = 'item' + (p.inferred ? ' inferred' : '');
+  b.innerHTML = '<span class="nm"><span class="num">' + (i+1) + '</span><span>' + p.name + '</span>' +
+    (p.inferred ? '<span class="tag">推断</span>' : '') + '</span>' +
+    '<span class="fn">' + p.desc + '</span>';
+  b.addEventListener('click', ()=>{ setView('physical'); select(i); focusOn(i); });
+  list.appendChild(b);
+});
+
+/* ============ 选中 ============ */
+let activeIdx = -1;
+function select(i){
+  activeIdx = i;
+  document.querySelectorAll('.spot').forEach((s,k)=>s.classList.toggle('active', k===i));
+  document.querySelectorAll('.item').forEach((s,k)=>s.classList.toggle('active', k===i));
+  const p = PARTS[i];
+  $('infoNum').textContent = i+1;
+  $('infoName').textContent = p.name;
+  $('infoDesc').textContent = p.desc;
+  $('infoBadge').style.display = p.inferred ? 'inline-block' : 'none';
+  $('info').classList.add('show');
+}
+function closeInfo(){
+  activeIdx = -1;
+  $('info').classList.remove('show');
+  document.querySelectorAll('.spot').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.item').forEach(s=>s.classList.remove('active'));
+}
+$('infoClose').addEventListener('click', closeInfo);
+
+/* ============ 缩放 / 平移 ============ */
+let BW = VIEWS.physical.w, BH = VIEWS.physical.h;
+let scale = 1, tx = 0, ty = 0;
+function apply(){
+  stage.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')';
+  stage.style.setProperty('--invscale', (1/scale).toFixed(4));
+  $('zoomInd').textContent = Math.round(scale*100) + '%';
+}
+function fit(){
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  const s = Math.min(vw/BW, vh/BH);
+  scale = s; tx = (vw - BW*s)/2; ty = (vh - BH*s)/2;
+  apply();
+}
+function zoomAt(px, py, f){
+  const ns = Math.min(Math.max(scale*f, 0.12), 6);
+  const k = ns/scale;
+  tx = px - (px-tx)*k; ty = py - (py-ty)*k; scale = ns; apply();
+}
+function panBy(dx,dy){ tx+=dx; ty+=dy; apply(); }
+
+$('btnIn').addEventListener('click', ()=>{ const r=viewport.getBoundingClientRect(); zoomAt(r.width/2,r.height/2,1.3); });
+$('btnOut').addEventListener('click', ()=>{ const r=viewport.getBoundingClientRect(); zoomAt(r.width/2,r.height/2,1/1.3); });
+$('btnFit').addEventListener('click', fit);
+$('btnList').addEventListener('click', ()=> $('sidebar').classList.toggle('open'));
+
+function focusOn(i){
+  const p = PARTS[i];
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  const s = Math.min(Math.max(scale, 2.0), 4);
+  const ntx = vw/2 - (p.x/100*BW*s);
+  const nty = vh/2 - (p.y/100*BH*s);
+  stage.classList.add('transition');
+  scale = s; tx = ntx; ty = nty; apply();
+  setTimeout(()=> stage.classList.remove('transition'), 360);
+}
+
+viewport.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const r = viewport.getBoundingClientRect();
+  zoomAt(e.clientX-r.left, e.clientY-r.top, e.deltaY<0?1.12:1/1.12);
+}, { passive:false });
+
+const pointers = new Map();
+let lastPinch = 0, moved = false, panning = false;
+viewport.addEventListener('pointerdown', e=>{
+  viewport.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, {x:e.clientX,y:e.clientY});
+  moved = false;
+  if(pointers.size===1){ panning=true; viewport.classList.add('grabbing'); }
+  if(pointers.size===2){ const [a,b]=[...pointers.values()]; lastPinch = Math.hypot(a.x-b.x,a.y-b.y); }
+});
+viewport.addEventListener('pointermove', e=>{
+  if(!pointers.has(e.pointerId)) return;
+  const prev = pointers.get(e.pointerId);
+  const dx = e.clientX-prev.x, dy = e.clientY-prev.y;
+  pointers.set(e.pointerId, {x:e.clientX,y:e.clientY});
+  if(pointers.size===1 && panning){
+    if(Math.abs(dx)+Math.abs(dy)>2) moved=true;
+    if(moved) panBy(dx,dy);
+  } else if(pointers.size===2){
+    const [a,b]=[...pointers.values()];
+    const dist = Math.hypot(a.x-b.x,a.y-b.y);
+    const mid = {x:(a.x+b.x)/2, y:(a.y+b.y)/2};
+    const r = viewport.getBoundingClientRect();
+    if(lastPinch>0) zoomAt(mid.x-r.left, mid.y-r.top, dist/lastPinch);
+    lastPinch = dist;
+  }
+});
+function endPointer(e){
+  pointers.delete(e.pointerId);
+  if(pointers.size<2) lastPinch=0;
+  if(pointers.size===0){ panning=false; viewport.classList.remove('grabbing'); }
+}
+viewport.addEventListener('pointerup', endPointer);
+viewport.addEventListener('pointercancel', endPointer);
+viewport.addEventListener('dblclick', e=>{
+  const r = viewport.getBoundingClientRect();
+  zoomAt(e.clientX-r.left, e.clientY-r.top, scale>1.5?1/1.8:1.8);
+});
+window.addEventListener('keydown', e=>{
+  if(e.key==='+'||e.key==='='){ const r=viewport.getBoundingClientRect(); zoomAt(r.width/2,r.height/2,1.25); }
+  else if(e.key==='-'){ const r=viewport.getBoundingClientRect(); zoomAt(r.width/2,r.height/2,1/1.25); }
+  else if(e.key==='0'){ fit(); }
+});
+
+img.addEventListener('load', fit);
+window.addEventListener('resize', fit);
+setView('physical');
+</script>
+</body>
+</html>
